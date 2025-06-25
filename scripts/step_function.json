@@ -1,7 +1,22 @@
 {
   "Comment": "Step Function to create a temporary EMR (EC2) cluster, run two Spark jobs in parallel, catalog results with Glue, and query with Athena.",
-  "StartAt": "Create EMR Cluster",
+  "StartAt": "Validate Raw S3 Files",
   "States": {
+    "Validate Raw S3 Files": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "validate_columns-lab4",
+        "Payload": {}
+      },
+      "Next": "Create EMR Cluster",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "FailState"
+        }
+      ]
+    },
     "Create EMR Cluster": {
       "Type": "Task",
       "Resource": "arn:aws:states:::elasticmapreduce:createCluster.sync",
@@ -39,9 +54,7 @@
       "Next": "Add Spark Steps Parallel",
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "FailState"
         }
       ]
@@ -114,9 +127,7 @@
       "Next": "Terminate EMR Cluster",
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "Terminate Cluster On Failure"
         }
       ]
@@ -130,9 +141,7 @@
       "Next": "Wait Before Glue Crawler",
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "Terminate Cluster On Failure"
         }
       ]
@@ -151,9 +160,7 @@
       "Next": "Wait Before Athena",
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "Terminate Cluster On Failure"
         }
       ]
@@ -173,9 +180,7 @@
       "End": true,
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "Terminate Cluster On Failure"
         }
       ]
