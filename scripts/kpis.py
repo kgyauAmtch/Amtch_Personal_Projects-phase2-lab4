@@ -15,11 +15,11 @@ if __name__ == "__main__":
         .config("spark.hadoop.fs.s3a.create.folder.marker", "false") \
         .getOrCreate()
 
-    # Input paths
-    df_vehicles = spark.read.parquet(f"{args.data_source}vehicles/").cache()
-    df_locations = spark.read.parquet(f"{args.data_source}locations/").cache()
-    df_users = spark.read.parquet(f"{args.data_source}users/").cache()
-    df_rentals = spark.read.parquet(f"{args.data_source}rentals/").cache()
+    # Input DataFrames 
+    df_vehicles = spark.read.parquet(f"{args.data_source}vehicles/")
+    df_locations = spark.read.parquet(f"{args.data_source}locations/")
+    df_users = spark.read.parquet(f"{args.data_source}users/")
+    df_rentals = spark.read.parquet(f"{args.data_source}rentals/")
 
     # ───────────────────── Location Metrics ─────────────────────
     df_rentals_loc = df_rentals.alias("r").join(
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         df_users.alias("u"),
         col("r.user_id") == col("u.user_id"),
         "inner"
-    ).select("r.*", "u.user_id", "u.first_name", "u.last_name", "u.email")
+    ).select("r.*", "u.first_name", "u.last_name", "u.email")
 
     user_metrics = df_rentals_users.groupBy("user_id", "first_name", "last_name", "email").agg(
         count("rental_id").alias("total_transactions"),
@@ -88,17 +88,8 @@ if __name__ == "__main__":
 
     user_metrics.write.mode("overwrite").parquet(f"{args.output_url}user_metrics/")
 
-    # ───────────────────── Cleanup ─────────────────────
-    df_vehicles.unpersist()
-    df_locations.unpersist()
-    df_users.unpersist()
-    df_rentals.unpersist()
-    df_rentals_loc.unpersist()
-    df_rentals_veh.unpersist()
-    df_rentals_users.unpersist()
-
     spark.stop()
-    print("\n KPI Calculation Complete. Metrics saved in 4 folders:")
+    print("\nKPI Calculation Complete. Metrics saved in 4 folders:")
     print("• location_metrics/")
     print("• vehicle_metrics/")
     print("• transaction_metrics/ (daily/, overall/)")
