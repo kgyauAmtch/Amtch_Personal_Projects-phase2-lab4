@@ -50,9 +50,9 @@
       "Type": "Parallel",
       "Branches": [
         {
-          "StartAt": "Add Step 1",
+          "StartAt": "Job 1",
           "States": {
-            "Add Step 1": {
+            "Job 1": {
               "Type": "Task",
               "Resource": "arn:aws:states:::elasticmapreduce:addStep.sync",
               "Parameters": {
@@ -68,7 +68,7 @@
                       "cluster",
                       "s3://lab4-bucket-gtp/emr-scripts/job1.py",
                       "--data_source",
-                      "s3://lab4-bucket-gtp/output/",
+                      "s3://lab4-bucket-gtp/raw/",
                       "--output_url",
                       "s3://lab4-bucket-gtp/output/"
                     ]
@@ -80,9 +80,9 @@
           }
         },
         {
-          "StartAt": "Add Step 2",
+          "StartAt": "Job 2",
           "States": {
-            "Add Step 2": {
+            "Job 2": {
               "Type": "Task",
               "Resource": "arn:aws:states:::elasticmapreduce:addStep.sync",
               "Parameters": {
@@ -117,7 +117,7 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "FailState"
+          "Next": "Terminate Cluster On Failure"
         }
       ]
     },
@@ -133,7 +133,7 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "FailState"
+          "Next": "Terminate Cluster On Failure"
         }
       ]
     },
@@ -154,7 +154,7 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "FailState"
+          "Next": "Terminate Cluster On Failure"
         }
       ]
     },
@@ -176,9 +176,17 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "FailState"
+          "Next": "Terminate Cluster On Failure"
         }
       ]
+    },
+    "Terminate Cluster On Failure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::elasticmapreduce:terminateCluster.sync",
+      "Parameters": {
+        "ClusterId.$": "$.ClusterInfo.ClusterId"
+      },
+      "Next": "FailState"
     },
     "FailState": {
       "Type": "Fail",
