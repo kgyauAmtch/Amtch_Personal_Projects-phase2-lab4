@@ -15,6 +15,9 @@ The pipeline consists of the following AWS services:
 - **Amazon Athena**: Executes SQL queries on the cataloged data.
 - **AWS Lambda**: Handles Athena query execution.
 
+   ![Architecture diagram](https://github.com/kgyauAmtch/Amtch_Personal_Projects-phase2-lab4/blob/production/architecture_gif/architecture_gif.gif)
+
+
 ## Prerequisites
 - **S3 Bucket** (`lab4-bucket-gtp`) with the following structure:
   - `s3://lab4-bucket-gtp/input/` for raw CSV data (users.csv, rental_transactions.csv, vehicles.csv, locations.csv).
