@@ -15,7 +15,8 @@ The pipeline consists of the following AWS services:
 - **Amazon Athena**: Executes SQL queries on the cataloged data.
 - **AWS Lambda**: Handles Athena query execution.
 
-   ![Architecture diagram](https://github.com/kgyauAmtch/Amtch_Personal_Projects-phase2-lab4/blob/production/architecture_gif/architecture_gif.gif)
+   ![Architecture diagram](Architecture.png)
+
 
 
 ## Prerequisites
