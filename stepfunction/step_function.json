@@ -1,5 +1,5 @@
 {
-  "Comment": "Step Function to create a temporary EMR (EC2) cluster, run two Spark jobs in parallel, catalog results with Glue, and query with Athena.",
+  "Comment": "Enhanced Step Function with retries and file archiving",
   "StartAt": "Validate Raw S3 Files",
   "States": {
     "Validate Raw S3 Files": {
@@ -7,12 +7,16 @@
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
         "FunctionName": "validate_columns-lab4",
-        "Payload": {}
+        "Payload": {
+          "action": "validate"
+        }
       },
       "Next": "Create EMR Cluster",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "FailState"
         }
       ]
@@ -52,9 +56,21 @@
       },
       "ResultPath": "$.ClusterInfo",
       "Next": "Add Spark Steps Parallel",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "FailState"
         }
       ]
@@ -127,7 +143,9 @@
       "Next": "Terminate EMR Cluster",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "Terminate Cluster On Failure"
         }
       ]
@@ -139,9 +157,21 @@
         "ClusterId.$": "$.ClusterInfo.ClusterId"
       },
       "Next": "Wait Before Glue Crawler",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "Terminate Cluster On Failure"
         }
       ]
@@ -158,16 +188,27 @@
         "Name": "lab4emr-1"
       },
       "Next": "Wait Before Athena",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 3
+        }
+      ],
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "Terminate Cluster On Failure"
         }
       ]
     },
     "Wait Before Athena": {
       "Type": "Wait",
-      "Seconds": 5,
+      "Seconds": 10,
       "Next": "Query in Athena"
     },
     "Query in Athena": {
@@ -177,11 +218,52 @@
         "FunctionName": "athena-lambda",
         "Payload.$": "$"
       },
+      "Next": "Archive and Delete Files",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Terminate Cluster On Failure"
+        }
+      ]
+    },
+    "Archive and Delete Files": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "validate_columns-lab4",
+        "Payload": {
+          "action": "archive",
+          "source_bucket": "lab4-bucket-gtp",
+          "folders": [
+            {
+              "source_prefix": "output/",
+              "destination_prefix": "archive/output/"
+            },
+            {
+              "source_prefix": "kpi_output/",
+              "destination_prefix": "archive/kpi_output/"
+            }
+          ]
+        }
+      },
       "End": true,
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
-          "Next": "Terminate Cluster On Failure"
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "FailState"
         }
       ]
     },
