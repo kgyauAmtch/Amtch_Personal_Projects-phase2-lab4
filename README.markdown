@@ -13,7 +13,7 @@ The pipeline:
 5. Queries the results using Athena via a Lambda function.
 
 Architecture Diagram
-![Architecture Diagram](architecture_gif.gif)
+![Architecture Diagram](images/Architecture.svg)
 
 ## Components
 - **step_function.json**: Defines the Step Function workflow to orchestrate the pipeline.
