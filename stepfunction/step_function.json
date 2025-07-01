@@ -1,6 +1,6 @@
 {
-  "Comment": "Step Function",
- "StartAt": "Validate Raw S3 Files",
+  "Comment": "Enhanced Step Function with retries and file archiving",
+  "StartAt": "Validate Raw S3 Files",
   "States": {
     "Validate Raw S3 Files": {
       "Type": "Task",
@@ -12,17 +12,6 @@
         }
       },
       "Next": "Create EMR Cluster",
-      "Logging": {
-        "Level": "ALL",
-        "IncludeExecutionData": true,
-        "Destinations": [
-          {
-            "CloudWatchLogsLogGroup": {
-              "LogGroupArn": "arn:aws:logs:eu-north-1:763927202642:log-group:/aws/stepfunctions/spark-job1:*"
-            }
-          }
-        ]
-      },
       "Catch": [
         {
           "ErrorEquals": [
@@ -60,35 +49,13 @@
               "InstanceCount": 2
             }
           ]
-        },
-        "Configurations": [
-          {
-            "Classification": "spark-log4j",
-            "Properties": {
-              "log4j.rootCategory": "INFO, console, cloudwatch",
-              "log4j.appender.cloudwatch": "org.apache.log4j.ConsoleAppender",
-              "log4j.appender.cloudwatch.layout": "org.apache.log4j.PatternLayout",
-              "log4j.appender.cloudwatch.layout.ConversionPattern": "%d{ISO8601} %p %c: %m%n"
-            }
-          }
-        ]
+        }
       },
       "ResultSelector": {
         "ClusterId.$": "$.ClusterId"
       },
       "ResultPath": "$.ClusterInfo",
       "Next": "Add Spark Steps Parallel",
-      "Logging": {
-        "Level": "ALL",
-        "IncludeExecutionData": true,
-        "Destinations": [
-          {
-            "CloudWatchLogsLogGroup": {
-              "LogGroupArn": "arn:aws:logs:eu-north-1:763927202642:log-group:/aws/stepfunctions/spark-job1:*"
-            }
-          }
-        ]
-      },
       "Retry": [
         {
           "ErrorEquals": [
@@ -128,10 +95,6 @@
                       "spark-submit",
                       "--deploy-mode",
                       "cluster",
-                      "--conf",
-                      "spark.eventLog.enabled=true",
-                      "--conf",
-                      "spark.eventLog.dir=s3://lab4-bucket-gtp/spark-logs/job1/",
                       "s3://lab4-bucket-gtp/emr-scripts1/job1.py",
                       "--data_source",
                       "s3://lab4-bucket-gtp/raw/",
@@ -140,17 +103,6 @@
                     ]
                   }
                 }
-              },
-              "Logging": {
-                "Level": "ALL",
-                "IncludeExecutionData": true,
-                "Destinations": [
-                  {
-                    "CloudWatchLogsLogGroup": {
-                      "LogGroupArn": "arn:aws:logs:eu-north-1:763927202642:log-group:/aws/stepfunctions/spark-job1:*"
-                    }
-                  }
-                ]
               },
               "End": true
             }
@@ -173,10 +125,6 @@
                       "spark-submit",
                       "--deploy-mode",
                       "cluster",
-                      "--conf",
-                      "spark.eventLog.enabled=true",
-                      "--conf",
-                      "spark.eventLog.dir=s3://lab4-bucket-gtp/spark-logs/job2/",
                       "s3://lab4-bucket-gtp/emr-scripts1/job2.py",
                       "--data_source",
                       "s3://lab4-bucket-gtp/raw/",
@@ -185,17 +133,6 @@
                     ]
                   }
                 }
-              },
-              "Logging": {
-                "Level": "ALL",
-                "IncludeExecutionData": true,
-                "Destinations": [
-                  {
-                    "CloudWatchLogsLogGroup": {
-                      "LogGroupArn": "arn:aws:logs:eu-north-1:763927202642:log-group:/aws/stepfunctions/spark-job1:*"
-                    }
-                  }
-                ]
               },
               "End": true
             }
@@ -251,17 +188,6 @@
         "Name": "lab4emr-1"
       },
       "Next": "Wait Before Athena",
-      "Logging": {
-        "Level": "ALL",
-        "IncludeExecutionData": true,
-        "Destinations": [
-          {
-            "CloudWatchLogsLogGroup": {
-              "LogGroupArn": "arn:aws:logs:eu-north-1:763927202642:log-group:/aws/stepfunctions/spark-job1:*"
-            }
-          }
-        ]
-      },
       "Retry": [
         {
           "ErrorEquals": [
@@ -293,17 +219,6 @@
         "Payload.$": "$"
       },
       "Next": "Archive and Delete Files",
-      "Logging": {
-        "Level": "ALL",
-        "IncludeExecutionData": true,
-        "Destinations": [
-          {
-            "CloudWatchLogsLogGroup": {
-              "LogGroupArn": "arn:aws:logs:eu-north-1:763927202642:log-group:/aws/stepfunctions/spark-job1:*"
-            }
-          }
-        ]
-      },
       "Retry": [
         {
           "ErrorEquals": [
@@ -332,10 +247,6 @@
           "source_bucket": "lab4-bucket-gtp",
           "folders": [
             {
-              "source_prefix": "output/",
-              "destination_prefix": "archive/output/"
-            },
-            {
               "source_prefix": "kpi_output/",
               "destination_prefix": "archive/kpi_output/"
             }
@@ -343,17 +254,6 @@
         }
       },
       "End": true,
-      "Logging": {
-        "Level": "ALL",
-        "IncludeExecutionData": true,
-        "Destinations": [
-          {
-            "CloudWatchLogsLogGroup": {
-              "LogGroupArn": "arn:aws:logs:eu-north-1:763927202642:log-group:/aws/stepfunctions/spark-job1:*"
-            }
-          }
-        ]
-      },
       "Catch": [
         {
           "ErrorEquals": [
@@ -376,16 +276,5 @@
       "Error": "WorkflowFailed",
       "Cause": "A step failed in the EMR pipeline."
     }
-  },
-  "loggingConfiguration": {
-    "level": "ALL",
-    "includeExecutionData": true,
-    "destinations": [
-      {
-        "cloudWatchLogsLogGroup": {
-          "logGroupArn": "arn:aws:logs:eu-north-1:763927202642:log-group:/aws/stepfunctions/spark-job1:*"
-        }
-      }
-    ]
   }
 }
