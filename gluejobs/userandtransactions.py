@@ -79,7 +79,3 @@ if __name__ == "__main__":
     user_metrics.write.mode("overwrite").parquet(f"{args.output_url}user_metrics/")
 
     spark.stop()
-    print("\nJob 2 Complete - User and Transaction Metrics:")
-    print("• users/ (transformed)")
-    print("• transaction_metrics/ (daily/, overall/)")
-    print("• user_metrics/")

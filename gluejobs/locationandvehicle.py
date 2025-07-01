@@ -92,9 +92,4 @@ if __name__ == "__main__":
     vehicle_metrics.write.mode("overwrite").parquet(f"{args.output_url}vehicle_metrics/")
 
     spark.stop()
-    print("\nJob 1 Complete - Vehicle and Location Metrics:")
-    print("• vehicles/ (transformed)")
-    print("• locations/ (transformed)")
-    print("• rentals/ (transformed)")
-    print("• location_metrics/")
-    print("• vehicle_metrics/")
+  
