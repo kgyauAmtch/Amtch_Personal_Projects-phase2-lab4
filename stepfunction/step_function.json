@@ -1,0 +1,280 @@
+{
+  "Comment": "Enhanced Step Function with retries and file archiving",
+  "StartAt": "Validate Raw S3 Files",
+  "States": {
+    "Validate Raw S3 Files": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "validate_columns-lab4",
+        "Payload": {
+          "action": "validate"
+        }
+      },
+      "Next": "Create EMR Cluster",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "FailState"
+        }
+      ]
+    },
+    "Create EMR Cluster": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::elasticmapreduce:createCluster.sync",
+      "Parameters": {
+        "Name": "lab4-sf-cluster",
+        "ReleaseLabel": "emr-6.15.0",
+        "ServiceRole": "EMR_DefaultRole-lab4new",
+        "JobFlowRole": "EMR_EC2_DefaultRole-lab4",
+        "LogUri": "s3://lab4-bucket-gtp/logs/",
+        "Applications": [
+          {
+            "Name": "Spark"
+          }
+        ],
+        "Instances": {
+          "KeepJobFlowAliveWhenNoSteps": true,
+          "InstanceGroups": [
+            {
+              "InstanceRole": "MASTER",
+              "InstanceType": "m5.xlarge",
+              "InstanceCount": 1
+            },
+            {
+              "InstanceRole": "CORE",
+              "InstanceType": "m5.xlarge",
+              "InstanceCount": 2
+            }
+          ]
+        }
+      },
+      "ResultSelector": {
+        "ClusterId.$": "$.ClusterId"
+      },
+      "ResultPath": "$.ClusterInfo",
+      "Next": "Add Spark Steps Parallel",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "FailState"
+        }
+      ]
+    },
+    "Add Spark Steps Parallel": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "Job 1",
+          "States": {
+            "Job 1": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::elasticmapreduce:addStep.sync",
+              "Parameters": {
+                "ClusterId.$": "$.ClusterInfo.ClusterId",
+                "Step": {
+                  "Name": "Spark Job 1",
+                  "ActionOnFailure": "CONTINUE",
+                  "HadoopJarStep": {
+                    "Jar": "command-runner.jar",
+                    "Args": [
+                      "spark-submit",
+                      "--deploy-mode",
+                      "cluster",
+                      "s3://lab4-bucket-gtp/emr-scripts1/job1.py",
+                      "--data_source",
+                      "s3://lab4-bucket-gtp/raw/",
+                      "--output_url",
+                      "s3://lab4-bucket-gtp/kpi_output/"
+                    ]
+                  }
+                }
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Job 2",
+          "States": {
+            "Job 2": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::elasticmapreduce:addStep.sync",
+              "Parameters": {
+                "ClusterId.$": "$.ClusterInfo.ClusterId",
+                "Step": {
+                  "Name": "Spark Job 2",
+                  "ActionOnFailure": "CONTINUE",
+                  "HadoopJarStep": {
+                    "Jar": "command-runner.jar",
+                    "Args": [
+                      "spark-submit",
+                      "--deploy-mode",
+                      "cluster",
+                      "s3://lab4-bucket-gtp/emr-scripts1/job2.py",
+                      "--data_source",
+                      "s3://lab4-bucket-gtp/raw/",
+                      "--output_url",
+                      "s3://lab4-bucket-gtp/kpi_output/"
+                    ]
+                  }
+                }
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.ParallelResult",
+      "Next": "Terminate EMR Cluster",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Terminate Cluster On Failure"
+        }
+      ]
+    },
+    "Terminate EMR Cluster": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::elasticmapreduce:terminateCluster.sync",
+      "Parameters": {
+        "ClusterId.$": "$.ClusterInfo.ClusterId"
+      },
+      "Next": "Wait Before Glue Crawler",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Terminate Cluster On Failure"
+        }
+      ]
+    },
+    "Wait Before Glue Crawler": {
+      "Type": "Wait",
+      "Seconds": 10,
+      "Next": "Trigger Glue Crawler"
+    },
+    "Trigger Glue Crawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Parameters": {
+        "Name": "lab4emr-1"
+      },
+      "Next": "Wait Before Athena",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 3
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Terminate Cluster On Failure"
+        }
+      ]
+    },
+    "Wait Before Athena": {
+      "Type": "Wait",
+      "Seconds": 10,
+      "Next": "Query in Athena"
+    },
+    "Query in Athena": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "athena-lambda",
+        "Payload.$": "$"
+      },
+      "Next": "Archive and Delete Files",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Terminate Cluster On Failure"
+        }
+      ]
+    },
+    "Archive and Delete Files": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "validate_columns-lab4",
+        "Payload": {
+          "action": "archive",
+          "source_bucket": "lab4-bucket-gtp",
+          "folders": [
+            {
+              "source_prefix": "kpi_output/",
+              "destination_prefix": "archive/kpi_output/"
+            }
+          ]
+        }
+      },
+      "End": true,
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "FailState"
+        }
+      ]
+    },
+    "Terminate Cluster On Failure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::elasticmapreduce:terminateCluster.sync",
+      "Parameters": {
+        "ClusterId.$": "$.ClusterInfo.ClusterId"
+      },
+      "Next": "FailState"
+    },
+    "FailState": {
+      "Type": "Fail",
+      "Error": "WorkflowFailed",
+      "Cause": "A step failed in the EMR pipeline."
+    }
+  }
+}
